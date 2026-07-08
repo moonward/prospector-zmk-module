@@ -45,6 +45,7 @@ static lv_obj_t *peripheral_bars[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_label_boxes[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_battery_labels[PERIPHERAL_COUNT];
+static lv_obj_t *peripheral_side_labels[PERIPHERAL_COUNT];
 
 static void init_styles(void) {
     if (styles_initialized) {
@@ -244,14 +245,21 @@ static void update_peripheral_display(uint8_t source) {
         if (PERIPHERAL_COUNT == 1) {
             lv_label_set_text(label, connected ? "PRPH" : "DISC");
         } else if (PERIPHERAL_COUNT == 2) {
-            char text[4];
+            char text[6];
             if (connected && level > 0) {
-                snprintf(text, sizeof(text), "%d", level);
+                snprintf(text, sizeof(text), "%d%%", level);
             } else {
                 snprintf(text, sizeof(text), "-");
             }
             lv_label_set_text(label, text);
+            lv_obj_align(label, LV_ALIGN_TOP_RIGHT, -8, 6);
         }
+    }
+
+    if (PERIPHERAL_COUNT == 2 && peripheral_side_labels[source]) {
+        lv_obj_remove_style(peripheral_side_labels[source], &style_label_disconnected, LV_PART_MAIN);
+        lv_obj_remove_style(peripheral_side_labels[source], &style_label_connected, LV_PART_MAIN);
+        lv_obj_add_style(peripheral_side_labels[source], label_style, LV_PART_MAIN);
     }
 
     if (battery_label) {
@@ -412,19 +420,35 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         lv_obj_align_to(battery_label, label_box, LV_ALIGN_OUT_BOTTOM_RIGHT, 0, 4);
 
     } else if (PERIPHERAL_COUNT == 2) {
-        int arc_size = 58;
-        int y_center = (62 - arc_size) / 2;
-        int spacing = 66;
+        lv_obj_set_size(widget->obj, 260, 62);
+
+        int card_gap = 8;
+        int card_width = (260 - card_gap) / 2;
+        int card_height = 62;
+        int ring_size = 40;
+        int ring_pad = 8;
 
         for (int i = 0; i < 2; i++) {
-            lv_obj_t *arc = lv_arc_create(widget->obj);
+            int card_x = i * (card_width + card_gap);
+
+            lv_obj_t *card = lv_obj_create(widget->obj);
+            peripheral_label_boxes[i] = card;
+            lv_obj_set_size(card, card_width, card_height);
+            lv_obj_set_pos(card, card_x, 0);
+            lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_radius(card, 10, LV_PART_MAIN);
+            lv_obj_set_style_border_width(card, 0, LV_PART_MAIN);
+            lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN);
+            lv_obj_add_style(card, &style_label_box_disconnected, LV_PART_MAIN);
+
+            lv_obj_t *arc = lv_arc_create(card);
             peripheral_arcs[i] = arc;
-            lv_obj_set_size(arc, arc_size, arc_size);
-            lv_obj_set_pos(arc, i * spacing, y_center);
+            lv_obj_set_size(arc, ring_size, ring_size);
+            lv_obj_set_pos(arc, ring_pad, (card_height - ring_size) / 2);
             lv_arc_set_range(arc, 0, 100);
             lv_arc_set_value(arc, 0);
-            lv_arc_set_bg_angles(arc, 270, 180);
-            lv_arc_set_rotation(arc, 0);
+            lv_arc_set_bg_angles(arc, 0, 360);
+            lv_arc_set_rotation(arc, 270);
             lv_obj_set_style_arc_width(arc, ARC_WIDTH_DISCONNECTED, LV_PART_MAIN);
             lv_obj_set_style_arc_width(arc, ARC_WIDTH_DISCONNECTED, LV_PART_INDICATOR);
             lv_obj_add_style(arc, &style_arc_ring_disconnected, LV_PART_MAIN);
@@ -432,23 +456,19 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
             lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
             lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
 
-            lv_obj_t *label_box = lv_obj_create(arc);
-            peripheral_label_boxes[i] = label_box;
-            lv_obj_set_size(label_box, 25, 25);
-            lv_obj_set_pos(label_box, 0, 0);
-            lv_obj_set_style_bg_opa(label_box, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_radius(label_box, 2, LV_PART_MAIN);
-            lv_obj_set_style_border_width(label_box, 0, LV_PART_MAIN);
-            lv_obj_set_style_pad_all(label_box, 0, LV_PART_MAIN);
-            lv_obj_add_style(label_box, &style_label_box_disconnected, LV_PART_MAIN);
+            lv_obj_t *digit_label = lv_label_create(card);
+            peripheral_labels[i] = digit_label;
+            lv_label_set_text(digit_label, "-");
+            lv_obj_set_style_text_font(digit_label, &FR_Medium_32, LV_PART_MAIN);
+            lv_obj_add_style(digit_label, &style_label_disconnected, LV_PART_MAIN);
+            lv_obj_align(digit_label, LV_ALIGN_TOP_RIGHT, -8, 6);
 
-            lv_obj_t *label = lv_label_create(label_box);
-            peripheral_labels[i] = label;
-            lv_label_set_text(label, "-");
-            lv_obj_set_style_text_font(label, &DINish_Medium_24, LV_PART_MAIN);
-            lv_obj_set_style_text_letter_space(label, -1, LV_PART_MAIN);
-            lv_obj_add_style(label, &style_label_disconnected, LV_PART_MAIN);
-            lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+            lv_obj_t *side_label = lv_label_create(card);
+            peripheral_side_labels[i] = side_label;
+            lv_label_set_text(side_label, i == 0 ? "LEFT" : "RIGHT");
+            lv_obj_set_style_text_font(side_label, &FG_Medium_20, LV_PART_MAIN);
+            lv_obj_add_style(side_label, &style_label_disconnected, LV_PART_MAIN);
+            lv_obj_align(side_label, LV_ALIGN_BOTTOM_RIGHT, -8, -6);
         }
 
     } else {
