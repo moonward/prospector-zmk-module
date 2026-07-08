@@ -478,7 +478,7 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
             lv_obj_set_size(digit_label, digit_width, card_height - 22);
             lv_obj_set_style_text_align(digit_label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
             lv_label_set_text(digit_label, "-");
-            lv_obj_set_style_text_font(digit_label, &FR_Medium_32, LV_PART_MAIN);
+            lv_obj_set_style_text_font(digit_label, &FG_Medium_26, LV_PART_MAIN);
             lv_obj_add_style(digit_label, &style_label_disconnected, LV_PART_MAIN);
 
             lv_obj_t *side_label = lv_label_create(card);
