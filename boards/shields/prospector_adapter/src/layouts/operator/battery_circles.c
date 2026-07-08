@@ -252,7 +252,16 @@ static void update_peripheral_display(uint8_t source) {
                 snprintf(text, sizeof(text), "-");
             }
             lv_label_set_text(label, text);
-            lv_obj_align(label, LV_ALIGN_TOP_RIGHT, -8, 6);
+
+            if (connected && level > 0 && level <= 15) {
+                lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_WPM_TEXT), LV_PART_MAIN);
+            } else if (connected && level > 0 && level <= 50) {
+                lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_MOD_CAPS_WORD), LV_PART_MAIN);
+            } else if (connected) {
+                lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN);
+            } else {
+                lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
+            }
         }
     }
 
@@ -425,8 +434,11 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         int card_gap = 8;
         int card_width = (260 - card_gap) / 2;
         int card_height = 62;
-        int ring_size = 40;
+        int ring_size = 34;
         int ring_pad = 8;
+        int ring_right_edge = ring_pad + ring_size;
+        int digit_x = ring_right_edge + 6;
+        int digit_width = card_width - digit_x - 8;
 
         for (int i = 0; i < 2; i++) {
             int card_x = i * (card_width + card_gap);
@@ -456,12 +468,18 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
             lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
             lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
 
+            // Fixed box that starts right of the ring: the number is right-aligned inside
+            // it, so even the widest string ("100%") grows within this box and can never
+            // encroach on the ring, no matter how many digits are shown.
             lv_obj_t *digit_label = lv_label_create(card);
             peripheral_labels[i] = digit_label;
+            lv_label_set_long_mode(digit_label, LV_LABEL_LONG_CLIP);
+            lv_obj_set_pos(digit_label, digit_x, 6);
+            lv_obj_set_size(digit_label, digit_width, card_height - 22);
+            lv_obj_set_style_text_align(digit_label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
             lv_label_set_text(digit_label, "-");
             lv_obj_set_style_text_font(digit_label, &FR_Medium_32, LV_PART_MAIN);
             lv_obj_add_style(digit_label, &style_label_disconnected, LV_PART_MAIN);
-            lv_obj_align(digit_label, LV_ALIGN_TOP_RIGHT, -8, 6);
 
             lv_obj_t *side_label = lv_label_create(card);
             peripheral_side_labels[i] = side_label;
