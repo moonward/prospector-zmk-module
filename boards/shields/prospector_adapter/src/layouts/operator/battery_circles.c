@@ -258,7 +258,7 @@ static void update_peripheral_display(uint8_t source) {
             } else if (connected && level > 0 && level <= 50) {
                 lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_MOD_CAPS_WORD), LV_PART_MAIN);
             } else if (connected) {
-                lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN);
+                lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_LAYER_DOT_ACTIVE), LV_PART_MAIN);
             } else {
                 lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
             }
