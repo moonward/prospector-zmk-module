@@ -46,7 +46,9 @@ static lv_obj_t *peripheral_label_boxes[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_battery_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_side_labels[PERIPHERAL_COUNT];
-static lv_obj_t *compact_battery_label;
+static lv_obj_t *compact_side_labels[2];
+static lv_obj_t *compact_value_labels[2];
+static lv_obj_t *compact_percent_labels[2];
 
 static void init_styles(void) {
     if (styles_initialized) {
@@ -181,43 +183,41 @@ struct connection_update_state {
 };
 
 static void update_compact_battery_label(void) {
-    if (!compact_battery_label || PERIPHERAL_COUNT != 2) {
+    if (PERIPHERAL_COUNT != 2 || !compact_side_labels[0] || !compact_side_labels[1] ||
+        !compact_value_labels[0] || !compact_value_labels[1]) {
         return;
     }
 
-    char left[5];
-    char right[5];
+    for (int i = 0; i < 2; i++) {
+        char value[4];
+        if (peripheral_connected[i] && peripheral_battery[i] > 0) {
+            snprintf(value, sizeof(value), "%d", peripheral_battery[i]);
+        } else {
+            snprintf(value, sizeof(value), "-");
+        }
 
-    if (peripheral_connected[0] && peripheral_battery[0] > 0) {
-        snprintf(left, sizeof(left), "%d%%", peripheral_battery[0]);
-    } else {
-        snprintf(left, sizeof(left), "-");
-    }
+        lv_label_set_text(compact_value_labels[i], value);
+        if (compact_percent_labels[i]) {
+            lv_label_set_text(compact_percent_labels[i],
+                              peripheral_connected[i] && peripheral_battery[i] > 0 ? "%" : "");
+        }
 
-    if (peripheral_connected[1] && peripheral_battery[1] > 0) {
-        snprintf(right, sizeof(right), "%d%%", peripheral_battery[1]);
-    } else {
-        snprintf(right, sizeof(right), "-");
-    }
+        uint32_t text_color = DISPLAY_COLOR_BATTERY_BG;
+        if (peripheral_connected[i]) {
+            if (peripheral_battery[i] > 0 && peripheral_battery[i] <= 15) {
+                text_color = DISPLAY_COLOR_WPM_TEXT;
+            } else if (peripheral_battery[i] > 0 && peripheral_battery[i] <= 50) {
+                text_color = DISPLAY_COLOR_MOD_CAPS_WORD;
+            } else {
+                text_color = DISPLAY_COLOR_LAYER_DOT_ACTIVE;
+            }
+        }
 
-    char text[20];
-    snprintf(text, sizeof(text), "L %s  R %s", left, right);
-    lv_label_set_text(compact_battery_label, text);
-
-    bool disconnected = !peripheral_connected[0] || !peripheral_connected[1];
-    bool critical = (peripheral_connected[0] && peripheral_battery[0] > 0 && peripheral_battery[0] <= 15) ||
-                    (peripheral_connected[1] && peripheral_battery[1] > 0 && peripheral_battery[1] <= 15);
-    bool low = (peripheral_connected[0] && peripheral_battery[0] > 0 && peripheral_battery[0] <= 50) ||
-               (peripheral_connected[1] && peripheral_battery[1] > 0 && peripheral_battery[1] <= 50);
-
-    if (critical) {
-        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_WPM_TEXT), LV_PART_MAIN);
-    } else if (low) {
-        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_MOD_CAPS_WORD), LV_PART_MAIN);
-    } else if (disconnected) {
-        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
-    } else {
-        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_LAYER_DOT_ACTIVE), LV_PART_MAIN);
+        lv_obj_set_style_text_color(compact_side_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
+        lv_obj_set_style_text_color(compact_value_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
+        if (compact_percent_labels[i]) {
+            lv_obj_set_style_text_color(compact_percent_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
+        }
     }
 }
 
@@ -479,14 +479,33 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
     } else if (PERIPHERAL_COUNT == 2) {
         lv_obj_set_size(widget->obj, 132, 62);
 
-        compact_battery_label = lv_label_create(widget->obj);
-        lv_label_set_long_mode(compact_battery_label, LV_LABEL_LONG_CLIP);
-        lv_obj_set_size(compact_battery_label, 130, 29);
-        lv_obj_set_pos(compact_battery_label, 0, 17);
-        lv_obj_set_style_text_font(compact_battery_label, &FG_Medium_20, LV_PART_MAIN);
-        lv_obj_set_style_text_align(compact_battery_label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-        lv_label_set_text(compact_battery_label, "L -  R -");
-        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
+        const char *sides[] = {"L", "R"};
+        const int side_x[] = {0, 66};
+        const int value_x[] = {15, 81};
+        const int percent_x[] = {51, 117};
+
+        for (int i = 0; i < 2; i++) {
+            compact_side_labels[i] = lv_label_create(widget->obj);
+            lv_label_set_text(compact_side_labels[i], sides[i]);
+            lv_obj_set_style_text_font(compact_side_labels[i], &FG_Medium_20, LV_PART_MAIN);
+            lv_obj_set_style_text_color(compact_side_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
+            lv_obj_set_pos(compact_side_labels[i], side_x[i], 18);
+
+            compact_value_labels[i] = lv_label_create(widget->obj);
+            lv_label_set_long_mode(compact_value_labels[i], LV_LABEL_LONG_CLIP);
+            lv_obj_set_size(compact_value_labels[i], 34, 24);
+            lv_obj_set_style_text_font(compact_value_labels[i], &DINish_Medium_24, LV_PART_MAIN);
+            lv_obj_set_style_text_align(compact_value_labels[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+            lv_obj_set_style_text_color(compact_value_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
+            lv_label_set_text(compact_value_labels[i], "-");
+            lv_obj_set_pos(compact_value_labels[i], value_x[i], 19);
+
+            compact_percent_labels[i] = lv_label_create(widget->obj);
+            lv_label_set_text(compact_percent_labels[i], "");
+            lv_obj_set_style_text_font(compact_percent_labels[i], &FG_Medium_20, LV_PART_MAIN);
+            lv_obj_set_style_text_color(compact_percent_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
+            lv_obj_set_pos(compact_percent_labels[i], percent_x[i], 18);
+        }
 
     } else {
         int box_width = 24;
