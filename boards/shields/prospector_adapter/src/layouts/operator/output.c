@@ -109,7 +109,7 @@ static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
 }
 
 static void output_timer_cb(lv_timer_t *timer) {
-    struct zmk_widget_output *widget = timer->user_data;
+    struct zmk_widget_output *widget = lv_timer_get_user_data(timer);
     update_output_widget(widget);
 }
 
