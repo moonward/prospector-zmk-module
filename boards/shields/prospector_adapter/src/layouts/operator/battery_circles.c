@@ -46,9 +46,7 @@ static lv_obj_t *peripheral_label_boxes[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_battery_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_side_labels[PERIPHERAL_COUNT];
-static lv_obj_t *compact_side_labels[2];
 static lv_obj_t *compact_value_labels[2];
-static lv_obj_t *compact_percent_labels[2];
 
 static void init_styles(void) {
     if (styles_initialized) {
@@ -183,8 +181,7 @@ struct connection_update_state {
 };
 
 static void update_compact_battery_label(void) {
-    if (PERIPHERAL_COUNT != 2 || !compact_side_labels[0] || !compact_side_labels[1] ||
-        !compact_value_labels[0] || !compact_value_labels[1]) {
+    if (PERIPHERAL_COUNT != 2 || !compact_value_labels[0] || !compact_value_labels[1]) {
         return;
     }
 
@@ -197,10 +194,6 @@ static void update_compact_battery_label(void) {
         }
 
         lv_label_set_text(compact_value_labels[i], value);
-        if (compact_percent_labels[i]) {
-            lv_label_set_text(compact_percent_labels[i],
-                              peripheral_connected[i] && peripheral_battery[i] > 0 ? "%" : "");
-        }
 
         uint32_t text_color = DISPLAY_COLOR_BATTERY_BG;
         if (peripheral_connected[i]) {
@@ -213,11 +206,7 @@ static void update_compact_battery_label(void) {
             }
         }
 
-        lv_obj_set_style_text_color(compact_side_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
         lv_obj_set_style_text_color(compact_value_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
-        if (compact_percent_labels[i]) {
-            lv_obj_set_style_text_color(compact_percent_labels[i], lv_color_hex(text_color), LV_PART_MAIN);
-        }
     }
 }
 
@@ -479,32 +468,29 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
     } else if (PERIPHERAL_COUNT == 2) {
         lv_obj_set_size(widget->obj, 132, 62);
 
-        const char *sides[] = {"L", "R"};
-        const int side_x[] = {0, 66};
-        const int value_x[] = {15, 81};
-        const int percent_x[] = {51, 117};
+        // Left value grows rightward (away from the centerline), right value grows
+        // leftward (also away from the centerline), so even "100" on both sides can
+        // never collide with the divider between them.
+        const int value_x[] = {2, 70};
+        const int value_width = 60;
+        const lv_text_align_t value_align[] = {LV_TEXT_ALIGN_LEFT, LV_TEXT_ALIGN_RIGHT};
+
+        lv_obj_t *divider = lv_obj_create(widget->obj);
+        lv_obj_set_size(divider, 1, 42);
+        lv_obj_set_pos(divider, 66, 10);
+        lv_obj_set_style_bg_color(divider, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
+        lv_obj_set_style_border_width(divider, 0, LV_PART_MAIN);
+        lv_obj_set_style_radius(divider, 0, LV_PART_MAIN);
 
         for (int i = 0; i < 2; i++) {
-            compact_side_labels[i] = lv_label_create(widget->obj);
-            lv_label_set_text(compact_side_labels[i], sides[i]);
-            lv_obj_set_style_text_font(compact_side_labels[i], &FG_Medium_20, LV_PART_MAIN);
-            lv_obj_set_style_text_color(compact_side_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
-            lv_obj_set_pos(compact_side_labels[i], side_x[i], 18);
-
             compact_value_labels[i] = lv_label_create(widget->obj);
             lv_label_set_long_mode(compact_value_labels[i], LV_LABEL_LONG_CLIP);
-            lv_obj_set_size(compact_value_labels[i], 34, 24);
-            lv_obj_set_style_text_font(compact_value_labels[i], &DINish_Medium_24, LV_PART_MAIN);
-            lv_obj_set_style_text_align(compact_value_labels[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+            lv_obj_set_size(compact_value_labels[i], value_width, 36);
+            lv_obj_set_style_text_font(compact_value_labels[i], &DINishExpanded_Light_36, LV_PART_MAIN);
+            lv_obj_set_style_text_align(compact_value_labels[i], value_align[i], LV_PART_MAIN);
             lv_obj_set_style_text_color(compact_value_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
             lv_label_set_text(compact_value_labels[i], "-");
-            lv_obj_set_pos(compact_value_labels[i], value_x[i], 19);
-
-            compact_percent_labels[i] = lv_label_create(widget->obj);
-            lv_label_set_text(compact_percent_labels[i], "");
-            lv_obj_set_style_text_font(compact_percent_labels[i], &FG_Medium_20, LV_PART_MAIN);
-            lv_obj_set_style_text_color(compact_percent_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
-            lv_obj_set_pos(compact_percent_labels[i], percent_x[i], 18);
+            lv_obj_set_pos(compact_value_labels[i], value_x[i], 13);
         }
 
     } else {
