@@ -46,6 +46,7 @@ static lv_obj_t *peripheral_label_boxes[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_battery_labels[PERIPHERAL_COUNT];
 static lv_obj_t *peripheral_side_labels[PERIPHERAL_COUNT];
+static lv_obj_t *compact_battery_label;
 
 static void init_styles(void) {
     if (styles_initialized) {
@@ -179,6 +180,47 @@ struct connection_update_state {
     bool connected;
 };
 
+static void update_compact_battery_label(void) {
+    if (!compact_battery_label || PERIPHERAL_COUNT != 2) {
+        return;
+    }
+
+    char left[5];
+    char right[5];
+
+    if (peripheral_connected[0] && peripheral_battery[0] > 0) {
+        snprintf(left, sizeof(left), "%d%%", peripheral_battery[0]);
+    } else {
+        snprintf(left, sizeof(left), "-");
+    }
+
+    if (peripheral_connected[1] && peripheral_battery[1] > 0) {
+        snprintf(right, sizeof(right), "%d%%", peripheral_battery[1]);
+    } else {
+        snprintf(right, sizeof(right), "-");
+    }
+
+    char text[20];
+    snprintf(text, sizeof(text), "L %s  R %s", left, right);
+    lv_label_set_text(compact_battery_label, text);
+
+    bool disconnected = !peripheral_connected[0] || !peripheral_connected[1];
+    bool critical = (peripheral_connected[0] && peripheral_battery[0] > 0 && peripheral_battery[0] <= 15) ||
+                    (peripheral_connected[1] && peripheral_battery[1] > 0 && peripheral_battery[1] <= 15);
+    bool low = (peripheral_connected[0] && peripheral_battery[0] > 0 && peripheral_battery[0] <= 50) ||
+               (peripheral_connected[1] && peripheral_battery[1] > 0 && peripheral_battery[1] <= 50);
+
+    if (critical) {
+        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_WPM_TEXT), LV_PART_MAIN);
+    } else if (low) {
+        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_MOD_CAPS_WORD), LV_PART_MAIN);
+    } else if (disconnected) {
+        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
+    } else {
+        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_LAYER_DOT_ACTIVE), LV_PART_MAIN);
+    }
+}
+
 static void update_peripheral_display(uint8_t source) {
     if (source >= PERIPHERAL_COUNT) {
         return;
@@ -186,6 +228,12 @@ static void update_peripheral_display(uint8_t source) {
 
     bool connected = peripheral_connected[source];
     uint8_t level = peripheral_battery[source];
+
+    if (PERIPHERAL_COUNT == 2) {
+        update_compact_battery_label();
+        return;
+    }
+
     bool low_battery = connected && level > 0 && level <= LOW_BATTERY_THRESHOLD;
 
     lv_obj_t *arc = peripheral_arcs[source];
@@ -429,65 +477,16 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         lv_obj_align_to(battery_label, label_box, LV_ALIGN_OUT_BOTTOM_RIGHT, 0, 4);
 
     } else if (PERIPHERAL_COUNT == 2) {
-        lv_obj_set_size(widget->obj, 260, 62);
+        lv_obj_set_size(widget->obj, 132, 62);
 
-        int card_gap = 8;
-        int card_width = (260 - card_gap) / 2;
-        int card_height = 62;
-        int ring_size = 34;
-        int ring_pad = 8;
-        int ring_right_edge = ring_pad + ring_size;
-        int digit_x = ring_right_edge + 6;
-        int digit_width = card_width - digit_x - 8;
-
-        for (int i = 0; i < 2; i++) {
-            int card_x = i * (card_width + card_gap);
-
-            lv_obj_t *card = lv_obj_create(widget->obj);
-            peripheral_label_boxes[i] = card;
-            lv_obj_set_size(card, card_width, card_height);
-            lv_obj_set_pos(card, card_x, 0);
-            lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_radius(card, 10, LV_PART_MAIN);
-            lv_obj_set_style_border_width(card, 0, LV_PART_MAIN);
-            lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN);
-            lv_obj_add_style(card, &style_label_box_disconnected, LV_PART_MAIN);
-
-            lv_obj_t *arc = lv_arc_create(card);
-            peripheral_arcs[i] = arc;
-            lv_obj_set_size(arc, ring_size, ring_size);
-            lv_obj_set_pos(arc, ring_pad, (card_height - ring_size) / 2);
-            lv_arc_set_range(arc, 0, 100);
-            lv_arc_set_value(arc, 0);
-            lv_arc_set_bg_angles(arc, 0, 360);
-            lv_arc_set_rotation(arc, 270);
-            lv_obj_set_style_arc_width(arc, ARC_WIDTH_DISCONNECTED, LV_PART_MAIN);
-            lv_obj_set_style_arc_width(arc, ARC_WIDTH_DISCONNECTED, LV_PART_INDICATOR);
-            lv_obj_add_style(arc, &style_arc_ring_disconnected, LV_PART_MAIN);
-            lv_obj_add_style(arc, &style_arc_ind_disconnected, LV_PART_INDICATOR);
-            lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
-            lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-
-            // Fixed box that starts right of the ring: the number is right-aligned inside
-            // it, so even the widest string ("100%") grows within this box and can never
-            // encroach on the ring, no matter how many digits are shown.
-            lv_obj_t *digit_label = lv_label_create(card);
-            peripheral_labels[i] = digit_label;
-            lv_label_set_long_mode(digit_label, LV_LABEL_LONG_CLIP);
-            lv_obj_set_pos(digit_label, digit_x, 6);
-            lv_obj_set_size(digit_label, digit_width, card_height - 22);
-            lv_obj_set_style_text_align(digit_label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-            lv_label_set_text(digit_label, "-");
-            lv_obj_set_style_text_font(digit_label, &FG_Medium_26, LV_PART_MAIN);
-            lv_obj_add_style(digit_label, &style_label_disconnected, LV_PART_MAIN);
-
-            lv_obj_t *side_label = lv_label_create(card);
-            peripheral_side_labels[i] = side_label;
-            lv_label_set_text(side_label, i == 0 ? "LEFT" : "RIGHT");
-            lv_obj_set_style_text_font(side_label, &FG_Medium_20, LV_PART_MAIN);
-            lv_obj_add_style(side_label, &style_label_disconnected, LV_PART_MAIN);
-            lv_obj_align(side_label, LV_ALIGN_BOTTOM_RIGHT, -8, -6);
-        }
+        compact_battery_label = lv_label_create(widget->obj);
+        lv_label_set_long_mode(compact_battery_label, LV_LABEL_LONG_CLIP);
+        lv_obj_set_size(compact_battery_label, 130, 29);
+        lv_obj_set_pos(compact_battery_label, 0, 17);
+        lv_obj_set_style_text_font(compact_battery_label, &FG_Medium_20, LV_PART_MAIN);
+        lv_obj_set_style_text_align(compact_battery_label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        lv_label_set_text(compact_battery_label, "L -  R -");
+        lv_obj_set_style_text_color(compact_battery_label, lv_color_hex(DISPLAY_COLOR_BATTERY_DISCONNECTED_LABEL), LV_PART_MAIN);
 
     } else {
         int box_width = 24;
