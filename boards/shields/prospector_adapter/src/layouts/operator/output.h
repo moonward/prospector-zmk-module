@@ -11,6 +11,7 @@ struct zmk_widget_output {
     lv_obj_t *usb_btn;
     lv_obj_t *ble_btn;
     lv_obj_t *slots[DISPLAYED_PROFILE_COUNT];
+    lv_timer_t *timer;
 };
 
 int zmk_widget_output_init(struct zmk_widget_output *widget, lv_obj_t *parent);

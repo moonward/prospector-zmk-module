@@ -69,6 +69,9 @@ static void set_slot_active(lv_obj_t *slot, bool active) {
 }
 
 static void update_output_widget(struct zmk_widget_output *widget) {
+    active_transport = zmk_endpoint_get_preferred_transport();
+    active_profile_index = zmk_ble_active_profile_index();
+
     bool is_usb = (active_transport == ZMK_TRANSPORT_USB);
     set_usb_btn_state(widget->usb_btn, is_usb);
     set_ble_btn_state(widget->ble_btn, !is_usb);
@@ -103,6 +106,11 @@ static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
         }
     }
     return ZMK_EV_EVENT_BUBBLE;
+}
+
+static void output_timer_cb(lv_timer_t *timer) {
+    struct zmk_widget_output *widget = timer->user_data;
+    update_output_widget(widget);
 }
 
 ZMK_LISTENER(widget_output_endpoint, endpoint_changed_listener);
@@ -170,11 +178,11 @@ int zmk_widget_output_init(struct zmk_widget_output *widget, lv_obj_t *parent) {
 
     if (sys_slist_is_empty(&widgets)) {
         active_profile_index = zmk_ble_active_profile_index();
-        struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
-        active_transport = selected.transport;
+        active_transport = zmk_endpoint_get_preferred_transport();
     }
 
     update_output_widget(widget);
+    widget->timer = lv_timer_create(output_timer_cb, 500, widget);
 
     sys_slist_append(&widgets, &widget->node);
 
