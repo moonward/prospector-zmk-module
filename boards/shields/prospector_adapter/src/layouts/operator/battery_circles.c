@@ -188,18 +188,22 @@ static void update_compact_battery_label(void) {
     for (int i = 0; i < 2; i++) {
         char value[4];
         if (peripheral_connected[i] && peripheral_battery[i] > 0) {
-            snprintf(value, sizeof(value), "%d", peripheral_battery[i]);
+            // 100% -> "00": keeps the reading a fixed 2 digits so the larger font
+            // never has to make room for a 3rd digit.
+            snprintf(value, sizeof(value), "%02d", peripheral_battery[i] % 100);
         } else {
-            snprintf(value, sizeof(value), "-");
+            snprintf(value, sizeof(value), "--");
         }
 
         lv_label_set_text(compact_value_labels[i], value);
 
+        // Same condition as the text formatting above, so "--" always pairs with the
+        // disconnected color instead of falling through to a numeric tier.
         uint32_t text_color = DISPLAY_COLOR_BATTERY_BG;
-        if (peripheral_connected[i]) {
-            if (peripheral_battery[i] > 0 && peripheral_battery[i] <= 15) {
+        if (peripheral_connected[i] && peripheral_battery[i] > 0) {
+            if (peripheral_battery[i] <= 15) {
                 text_color = DISPLAY_COLOR_WPM_TEXT;
-            } else if (peripheral_battery[i] > 0 && peripheral_battery[i] <= 50) {
+            } else if (peripheral_battery[i] <= 50) {
                 text_color = DISPLAY_COLOR_MOD_CAPS_WORD;
             } else {
                 text_color = DISPLAY_COLOR_LAYER_DOT_ACTIVE;
@@ -468,11 +472,11 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
     } else if (PERIPHERAL_COUNT == 2) {
         lv_obj_set_size(widget->obj, 132, 62);
 
-        // Left value grows rightward (away from the centerline), right value grows
-        // leftward (also away from the centerline), so even "100" on both sides can
-        // never collide with the divider between them.
-        const int value_x[] = {2, 70};
-        const int value_width = 60;
+        // Reading is always exactly 2 characters ("%02d" or "--"), so text width is
+        // fixed -- left value hugs the left edge, right value hugs the right edge,
+        // divider in between.
+        const int value_x[] = {1, 67};
+        const int value_width = 64;
         const lv_text_align_t value_align[] = {LV_TEXT_ALIGN_LEFT, LV_TEXT_ALIGN_RIGHT};
 
         lv_obj_t *divider = lv_obj_create(widget->obj);
@@ -485,12 +489,12 @@ int zmk_widget_battery_circles_init(struct zmk_widget_battery_circles *widget, l
         for (int i = 0; i < 2; i++) {
             compact_value_labels[i] = lv_label_create(widget->obj);
             lv_label_set_long_mode(compact_value_labels[i], LV_LABEL_LONG_CLIP);
-            lv_obj_set_size(compact_value_labels[i], value_width, 36);
-            lv_obj_set_style_text_font(compact_value_labels[i], &DINishExpanded_Light_36, LV_PART_MAIN);
+            lv_obj_set_size(compact_value_labels[i], value_width, 52);
+            lv_obj_set_style_text_font(compact_value_labels[i], &FR_Regular_48, LV_PART_MAIN);
             lv_obj_set_style_text_align(compact_value_labels[i], value_align[i], LV_PART_MAIN);
             lv_obj_set_style_text_color(compact_value_labels[i], lv_color_hex(DISPLAY_COLOR_BATTERY_BG), LV_PART_MAIN);
-            lv_label_set_text(compact_value_labels[i], "-");
-            lv_obj_set_pos(compact_value_labels[i], value_x[i], 13);
+            lv_label_set_text(compact_value_labels[i], "--");
+            lv_obj_set_pos(compact_value_labels[i], value_x[i], 5);
         }
 
     } else {
