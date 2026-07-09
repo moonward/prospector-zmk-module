@@ -63,7 +63,7 @@ static void set_slot_active(lv_obj_t *slot, bool active) {
     } else {
         lv_obj_set_style_bg_color(slot, lv_color_hex(DISPLAY_COLOR_SLOT_INACTIVE_BG), LV_PART_MAIN);
         if (label) {
-            lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN);
+            lv_obj_set_style_text_color(label, lv_color_hex(DISPLAY_COLOR_SLOT_TEXT), LV_PART_MAIN);
         }
     }
 }
